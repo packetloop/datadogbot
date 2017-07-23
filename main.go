@@ -28,7 +28,10 @@ func main() {
 
 	token := os.Getenv("SLACK_TOKEN")
 	logger, err := syslog.NewLogger(syslog.LOG_LOCAL3, log.Lmicroseconds)
-	logger.SetPrefix("slackbot")
+
+	// Explicitly add a trailing space. Set prefix does not add a trailing
+	// space.
+	logger.SetPrefix("slackbot ")
 	slack.SetLogger(logger)
 	api := slack.New(token)
 
@@ -54,7 +57,7 @@ func main() {
 					logger.Printf("getting bot name error %s", err.Error())
 				}
 
-				logger.Printf("channel %s bot %s environment %s alert type %s %s %s",
+				logger.Printf("%s %s %s %s %s %s",
 					channel.Name, bot.Name, alert.Environment, alert.Type,
 					alert.Title, stringMinifier(alert.Text))
 			}
