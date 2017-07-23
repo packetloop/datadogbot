@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"log/syslog"
 	"os"
@@ -37,7 +36,6 @@ func main() {
 	go rtm.ManageConnection()
 
 	for msg := range rtm.IncomingEvents {
-		fmt.Printf("Event Received: %+#v\n", msg)
 		switch ev := msg.Data.(type) {
 		case *slack.ConnectedEvent:
 			// Ignore connected events
