@@ -8,8 +8,9 @@ deploy:
   api_key:
     secure: l4UsPC1JwoW91olRK0w1DmBNISKrBK05UUMzPoJwlc6yRfSsiaO0vN8/DQlTy83Z3dcEL7hBmvXfiNZleyNPWKiz+wHpBGsTqgwZ9oowF5cr/XHj+VyFlGxHIKGCzfZWaJrGX/9q4UEUAgmhh3Q/oTSS8ZydQk5WdyjiBDdjXJYY1h/gmX99siRur6FRERmL0jpfz2y/aWD0UmTqgmh2Z+jadQcFjgdbjXA395w95gMpUMngedV1rYojAoS59vwSIhU7n2VeLnPQ4slRN8NobEAx6ybbeg63bqYm05keTSHtc/ws67Lnpw0bUfLVyOEN5TjDSopbScTbYNK83+ReAfQWDZ+mOGYOwqSl+jCvstF8oG6kFQrWQ1PT0vPZxh9z9JiWfKnAH57B1LXPYkss18eGE5TU+Yv2Jaw6CaF4wCZ4c1Cu89xZreR/Bz2iZdTnkUPiSFrV2NF0DtvpcJV8/8xoJPotuwE3F08VCOtFhI1oa3HYN2Xuo8tNdjltJCw7QL+dsOo6/GMMb8liwtN1AcASc2b6AzUyqIL4TtUA69m90UmGSHCb2nqxLu6M+DOfPWdvoNaKZanS3OKx/mICjTd6xHgkzzm0IglZYCygtAXdOI2FLHAVyOKGuZQt7UnmMwf5ZQ8C3UIx5l2nHc73brrXHcmNbtK1fb30ylgh5lU=
   file:
-    - release/datadogbot-linux-amd64$
-    - release/datadogbot-darwin-amd64$
+    - release/datadogbot-linux-amd64
+    - release/datadogbot-darwin-amd64
   skip_cleanup: true$
   on:
+    tags: true
     repo: packetloop/datadogbot
