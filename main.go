@@ -3,12 +3,23 @@ package main
 import (
 	"fmt"
 	"log"
+	"log/syslog"
 	"os"
+	"strings"
 	"unicode"
 
 	"github.com/joho/godotenv"
 	"github.com/nlopes/slack"
 )
+
+type alertEvent struct {
+	Type        string
+	Channel     string
+	Title       string
+	BotID       string
+	Text        string
+	Environment string
+}
 
 func main() {
 	err := godotenv.Load()
@@ -17,48 +28,66 @@ func main() {
 	}
 
 	token := os.Getenv("SLACK_TOKEN")
+	logger, err := syslog.NewLogger(syslog.LOG_LOCAL3, log.Lmicroseconds)
+	logger.SetPrefix("slackbot")
+	slack.SetLogger(logger)
 	api := slack.New(token)
-	api.SetDebug(true)
 
 	rtm := api.NewRTM()
 	go rtm.ManageConnection()
-	logger := log.New(os.Stdout, "slack-bot: ", log.Lshortfile|log.LstdFlags)
-
-	slack.SetLogger(logger)
-	api.SetDebug(true)
 
 	for msg := range rtm.IncomingEvents {
 		fmt.Printf("Event Received: %+#v\n", msg)
 		switch ev := msg.Data.(type) {
 		case *slack.ConnectedEvent:
-			// fmt.Println("Infos:", ev.Info)
-			// fmt.Println("Connection counter:", ev.ConnectionCount)
-			// Replace #general with your Channel ID
-			// rtm.SendMessage(rtm.NewOutgoingMessage("Hello world", "#genera"))
+			// Ignore connected events
 
 		case *slack.MessageEvent:
-			fmt.Printf("ALERT BOT ID: %+#v\n", ev.BotID)
-			fmt.Printf("ALERT Title: %s\n", ev.Attachments[0].Title)
-			fmt.Printf("ALERT Text : %s\n", stringMinifier(ev.Attachments[0].Text))
-			fmt.Printf("ALERT Channel: %+#v\n", ev.Channel)
-			// log to stdout syslog format with
-			/*
-				alert_type: triggered/recovered
-				message: text
-				alert_name: [atlasdossubmissionsbucket] [backup-artifacts] [failure] [staging]
-			*/
-			// Ignore
-			// fmt.Printf("Message: %v\n", ev)
-			// fmt.Printf("Subtype: %v\n", ev.SubType)
-			// fmt.Printf("alert message: %+#v\n", ev.SubMessage)
+			// We only listen to alerts that comes from Datadog Bot ID and ignore
+			// all other alerts.
+			if ev.BotID == "B1V1KFA0K" {
+				alert := parseAlert(ev)
+				channel, _ := rtm.GetChannelInfo(alert.Channel)
+				if err != nil {
+					logger.Printf("getting channel name error %s", err.Error())
+				}
+				bot, err := rtm.GetBotInfo(alert.BotID)
+				if err != nil {
+					logger.Printf("getting bot name error %s", err.Error())
+				}
+				fmt.Printf("channel string: %s\n", channel.Name)
+				logger.Printf("channel %s bot %s environment %s alert type %s %s %s",
+					channel.Name, bot.Name, alert.Environment, alert.Type,
+					alert.Title, stringMinifier(alert.Text))
+			}
 
 		case *slack.RTMError:
-			// fmt.Printf("Error: %s\n", ev.Error())
+			logger.Printf("rtm error: %s\n", ev.Error())
 
 		default:
 			// Ignore other events..
-			// fmt.Printf("Unexpected: %v\n", msg.Data)
 		}
+	}
+}
+
+// Parse alert
+func parseAlert(ev *slack.MessageEvent) alertEvent {
+	event := strings.Split(ev.Attachments[0].Title, " ")
+	var alertName []string
+	for i, v := range event {
+		if i == 0 || i == len(event)-1 {
+			continue
+		}
+		alertName = append(alertName, v)
+	}
+
+	return alertEvent{
+		Type:        strings.Trim(event[0], ": "),
+		Channel:     ev.Channel,
+		BotID:       ev.BotID,
+		Text:        ev.Attachments[0].Text,
+		Environment: event[len(event)-1],
+		Title:       strings.Join(alertName, " "),
 	}
 }
 

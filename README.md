@@ -8,4 +8,13 @@ to fix in platform.
 Usage:
 ======
 
-TBD
+Set Slack API token:
+
+```bash
+$ cp env.example .env
+```
+
+TBD:
+
+1. Write tests
+
