@@ -55,7 +55,7 @@ func main() {
 				if err != nil {
 					logger.Printf("getting bot name error %s", err.Error())
 				}
-				fmt.Printf("channel string: %s\n", channel.Name)
+
 				logger.Printf("channel %s bot %s environment %s alert type %s %s %s",
 					channel.Name, bot.Name, alert.Environment, alert.Type,
 					alert.Title, stringMinifier(alert.Text))
