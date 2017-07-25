@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"log/syslog"
 	"os"
@@ -15,19 +16,31 @@ type alertEvent struct {
 	Type        string
 	Channel     string
 	Title       string
-	BotID       string
+	BotName     string
 	Text        string
 	Environment string
 }
 
-func main() {
+var (
+	botName, token string
+	logger         *log.Logger
+	rtm            *slack.RTM
+)
+
+func init() {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
 
-	token := os.Getenv("SLACK_TOKEN")
-	logger, err := syslog.NewLogger(syslog.LOG_LOCAL3, log.Lmicroseconds)
+	token = os.Getenv("SLACK_TOKEN")
+	botName = os.Getenv("BOTNAME")
+
+	logger, err = syslog.NewLogger(syslog.LOG_LOCAL3, log.Lmicroseconds)
+	if err != nil {
+		fmt.Println("Cannot set syslog")
+		os.Exit(1)
+	}
 
 	// Explicitly add a trailing space. Set prefix does not add a trailing
 	// space.
@@ -35,9 +48,15 @@ func main() {
 	slack.SetLogger(logger)
 	api := slack.New(token)
 
-	rtm := api.NewRTM()
+	rtm = api.NewRTM()
+}
+
+func main() {
 	go rtm.ManageConnection()
 
+	event := make(chan alertEvent)
+	data := make(chan *slack.MessageEvent)
+	go parseAlert(data, event)
 	for msg := range rtm.IncomingEvents {
 		switch ev := msg.Data.(type) {
 		case *slack.ConnectedEvent:
@@ -46,22 +65,8 @@ func main() {
 		case *slack.MessageEvent:
 			// We only listen to alerts that comes from Datadog Bot ID and ignore
 			// all other alerts.
-			if ev.BotID == "B1V1KFA0K" {
-				alert := parseAlert(ev)
-				channel, _ := rtm.GetChannelInfo(alert.Channel)
-				if err != nil {
-					logger.Printf("getting channel name error %s", err.Error())
-				}
-				bot, err := rtm.GetBotInfo(alert.BotID)
-				if err != nil {
-					logger.Printf("getting bot name error %s", err.Error())
-				}
-
-				logger.Printf("%s %s %s %s %s %s",
-					channel.Name, bot.Name, alert.Environment, alert.Type,
-					alert.Title, stringMinifier(alert.Text))
-			}
-
+			data <- ev
+			go listen(event, rtm)
 		case *slack.RTMError:
 			logger.Printf("rtm error: %s\n", ev.Error())
 
@@ -71,25 +76,60 @@ func main() {
 	}
 }
 
-// Parse alert
-func parseAlert(ev *slack.MessageEvent) alertEvent {
-	event := strings.Split(ev.Attachments[0].Title, " ")
-	var alertName []string
-	for i, v := range event {
-		if i == 0 || i == len(event)-1 {
-			continue
-		}
-		alertName = append(alertName, v)
+func listen(event chan alertEvent, rtm *slack.RTM) {
+	for alert := range event {
+		logger.Printf("%s %s %s %s %s description %s",
+			alert.Channel, alert.BotName, alert.Environment, alert.Type,
+			alert.Title, stringMinifier(alert.Text))
 	}
+}
 
-	return alertEvent{
-		Type:        strings.Trim(event[0], ": "),
-		Channel:     ev.Channel,
-		BotID:       ev.BotID,
-		Text:        ev.Attachments[0].Text,
-		Environment: event[len(event)-1],
-		Title:       strings.Join(alertName, " "),
+func getBotName(botID string) string {
+	evBot, err := rtm.GetBotInfo(botID)
+	if err != nil {
+		logger.Printf("getting bot name error %s", err.Error())
 	}
+	return evBot.Name
+}
+
+func getChannelName(channel string) string {
+	ch, err := rtm.GetChannelInfo(channel)
+	if err != nil {
+		logger.Printf("getting channel name error %s", err.Error())
+	}
+	return ch.Name
+}
+
+// Parse alert
+func parseAlert(data <-chan *slack.MessageEvent, alert chan<- alertEvent) {
+	for ev := range data {
+		evBotName := getBotName(ev.BotID)
+		channelName := getChannelName(ev.Channel)
+		if evBotName == botName {
+			event := strings.Split(ev.Attachments[0].Title, " ")
+			var alertName []string
+			for i, v := range event {
+				if i == 0 || i == len(event)-1 {
+					continue
+				}
+				alertName = append(alertName, alertTitleMinify(v))
+			}
+
+			alert <- alertEvent{
+				Type:        strings.Trim(event[0], ": "),
+				Channel:     channelName,
+				BotName:     evBotName,
+				Text:        ev.Attachments[0].Text,
+				Environment: event[len(event)-1],
+				Title:       strings.Join(alertName, " "),
+			}
+		}
+	}
+}
+
+// Minify alert title
+func alertTitleMinify(s string) string {
+	return strings.TrimSuffix(strings.TrimPrefix(s, "["), "]")
 }
 
 // Minify slack event text
