@@ -56,17 +56,17 @@ func main() {
 
 	event := make(chan alertEvent)
 	data := make(chan *slack.MessageEvent)
-	go parseAlert(data, event)
+	for i := 0; i <= 10; i++ {
+		go parseAlert(data, event)
+		go listen(event, rtm)
+	}
 	for msg := range rtm.IncomingEvents {
 		switch ev := msg.Data.(type) {
 		case *slack.ConnectedEvent:
 			// Ignore connected events
 
 		case *slack.MessageEvent:
-			// We only listen to alerts that comes from Datadog Bot ID and ignore
-			// all other alerts.
 			data <- ev
-			go listen(event, rtm)
 		case *slack.RTMError:
 			logger.Printf("rtm error: %s\n", ev.Error())
 
@@ -103,25 +103,29 @@ func getChannelName(channel string) string {
 // Parse alert
 func parseAlert(data <-chan *slack.MessageEvent, alert chan<- alertEvent) {
 	for ev := range data {
+		// We only listen to alerts that comes from Datadog and ignore
+		// all other alerts.
 		evBotName := getBotName(ev.BotID)
-		channelName := getChannelName(ev.Channel)
 		if evBotName == botName {
-			event := strings.Split(ev.Attachments[0].Title, " ")
-			var alertName []string
-			for i, v := range event {
-				if i == 0 || i == len(event)-1 {
-					continue
+			channelName := getChannelName(ev.Channel)
+			if evBotName == botName {
+				event := strings.Split(ev.Attachments[0].Title, " ")
+				var alertName []string
+				for i, v := range event {
+					if i == 0 || i == len(event)-1 {
+						continue
+					}
+					alertName = append(alertName, alertTitleMinify(v))
 				}
-				alertName = append(alertName, alertTitleMinify(v))
-			}
 
-			alert <- alertEvent{
-				Type:        strings.Trim(event[0], ": "),
-				Channel:     channelName,
-				BotName:     evBotName,
-				Text:        ev.Attachments[0].Text,
-				Environment: event[len(event)-1],
-				Title:       strings.Join(alertName, " "),
+				alert <- alertEvent{
+					Type:        strings.Trim(event[0], ": "),
+					Channel:     channelName,
+					BotName:     evBotName,
+					Text:        ev.Attachments[0].Text,
+					Environment: event[len(event)-1],
+					Title:       strings.Join(alertName, " "),
+				}
 			}
 		}
 	}
