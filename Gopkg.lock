@@ -19,9 +19,15 @@
   packages = ["websocket"]
   revision = "ab5485076ff3407ad2d02db054635913f017b0ed"
 
+[[projects]]
+  name = "gopkg.in/matryer/try.v1"
+  packages = ["."]
+  revision = "312d2599e12e89ca89b52a09597394f449235d80"
+  version = "v1"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d3d6a2f88e85440cd36f77254c12143abf6d77f61d32e2fd6ba9d63626f8a3d6"
+  inputs-digest = "e37d61dfe931f1766fe772ff72b1a6c439d9ff812d29b684677256b36aa8b2ed"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -6,7 +6,10 @@ import (
 	"log/syslog"
 	"os"
 	"strings"
+	"time"
 	"unicode"
+
+	try "gopkg.in/matryer/try.v1"
 
 	"github.com/joho/godotenv"
 	"github.com/nlopes/slack"
@@ -84,20 +87,22 @@ func listen(event chan alertEvent, rtm *slack.RTM) {
 	}
 }
 
-func getBotName(botID string) string {
+func getBotName(botID string) (string, error) {
 	evBot, err := rtm.GetBotInfo(botID)
 	if err != nil {
 		logger.Printf("getting bot name error %s", err.Error())
+		return "", err
 	}
-	return evBot.Name
+	return evBot.Name, nil
 }
 
-func getChannelName(channel string) string {
+func getChannelName(channel string) (string, error) {
 	ch, err := rtm.GetChannelInfo(channel)
 	if err != nil {
 		logger.Printf("getting channel name error %s", err.Error())
+		return "", err
 	}
-	return ch.Name
+	return ch.Name, nil
 }
 
 // Parse alert
@@ -105,9 +110,33 @@ func parseAlert(data <-chan *slack.MessageEvent, alert chan<- alertEvent) {
 	for ev := range data {
 		// We only listen to alerts that comes from Datadog and ignore
 		// all other alerts.
-		evBotName := getBotName(ev.BotID)
+		var evBotName string
+		err := try.Do(func(attempt int) (bool, error) {
+			var err error
+			evBotName, err = getBotName(ev.BotID)
+			if err != nil {
+				time.Sleep(1 * time.Minute)
+			}
+			return attempt < 10, err
+		})
+		if err != nil {
+			logger.Printf("Retry attemp failed: %s\n", err)
+		}
+
+		var channelName string
+		err = try.Do(func(attempt int) (bool, error) {
+			var err error
+			channelName, err = getChannelName(ev.Channel)
+			if err != nil {
+				time.Sleep(1 * time.Minute)
+			}
+			return attempt < 10, err
+		})
+		if err != nil {
+			logger.Printf("Retry attemp failed: %s\n", err)
+		}
+
 		if evBotName == botName {
-			channelName := getChannelName(ev.Channel)
 			if evBotName == botName {
 				event := strings.Split(ev.Attachments[0].Title, " ")
 				var alertName []string
