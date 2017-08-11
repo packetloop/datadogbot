@@ -39,7 +39,7 @@ func init() {
 	token = os.Getenv("SLACK_TOKEN")
 	botName = os.Getenv("BOTNAME")
 
-	logger, err = syslog.NewLogger(syslog.LOG_LOCAL3, log.Lmicroseconds)
+	logger, err = syslog.NewLogger(syslog.LOG_LOCAL6, log.Lmicroseconds)
 	if err != nil {
 		fmt.Println("Cannot set syslog")
 		os.Exit(1)
@@ -55,6 +55,8 @@ func init() {
 }
 
 func main() {
+
+	logger.Printf("datadogbot started version %g\n", 0.7)
 	go rtm.ManageConnection()
 
 	event := make(chan alertEvent)
@@ -99,6 +101,14 @@ func getBotName(botID string) (string, error) {
 func getChannelName(channel string) (string, error) {
 	ch, err := rtm.GetChannelInfo(channel)
 	if err != nil {
+		// TODO: Check if there's CONST ERROR we could use instead of matching
+		// error string value.
+		if strings.Contains(err.Error(), "channel_not_found") {
+			// This is because we have channels that are for private use
+			// and we either manually join or from an invite but we don't
+			// really care about them anyway.
+			return "other_private_channels", nil
+		}
 		logger.Printf("getting channel name error %s", err.Error())
 		return "", err
 	}
@@ -120,7 +130,7 @@ func parseAlert(data <-chan *slack.MessageEvent, alert chan<- alertEvent) {
 			return attempt < 10, err
 		})
 		if err != nil {
-			logger.Printf("Retry attemp failed: %s\n", err)
+			logger.Printf("Retry attempt failed: %s\n", err)
 		}
 
 		var channelName string
@@ -133,7 +143,7 @@ func parseAlert(data <-chan *slack.MessageEvent, alert chan<- alertEvent) {
 			return attempt < 10, err
 		})
 		if err != nil {
-			logger.Printf("Retry attemp failed: %s\n", err)
+			logger.Printf("Retry attempt failed: %s\n", err)
 		}
 
 		if evBotName == botName {
