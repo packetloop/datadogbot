@@ -176,6 +176,7 @@ func alertTitleMinify(s string) string {
 }
 
 // Minify slack event text
+// Replace newline with space in Slack alert text/description.
 func stringMinifier(in string) (out string) {
 	white := false
 	for _, c := range in {
