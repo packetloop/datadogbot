@@ -1,4 +1,6 @@
 language: go
+env:
+- SLACK_TOKEN=token BOTNAME=bot
 go:
 - tip
 before_install:
