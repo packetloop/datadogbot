@@ -31,15 +31,18 @@ var (
 )
 
 func init() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
+	if len(os.Getenv("SLACK_TOKEN")) <= 0 {
+		loadEnv("SLACK_TOKEN")
+	}
+
+	if len(os.Getenv("BOTNAME")) <= 0 {
+		loadEnv("BOTNAME")
 	}
 
 	token = os.Getenv("SLACK_TOKEN")
 	botName = os.Getenv("BOTNAME")
 
-	logger, err = syslog.NewLogger(syslog.LOG_LOCAL6, log.Lmicroseconds)
+	logger, err := syslog.NewLogger(syslog.LOG_LOCAL6, log.Lmicroseconds)
 	if err != nil {
 		fmt.Println("Cannot set syslog")
 		os.Exit(1)
@@ -52,6 +55,13 @@ func init() {
 	api := slack.New(token)
 
 	rtm = api.NewRTM()
+}
+
+func loadEnv(e string) {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Error loading .env file or please set %s variable.\n", e)
+	}
 }
 
 func main() {
