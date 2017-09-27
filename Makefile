@@ -10,10 +10,21 @@ release: install
 	GOOS=darwin GOARCH=amd64 go build -o release/$(PROJECT_NAME)-darwin-amd64 $(package)
 
 .PHONY: install
-install:
+install: package coverage
+	go build
+	go build ./...
+
+.PHONY: test
+test:
+	go test -race -v
+
+.PHONY: coverage
+coverage: test
+	go get github.com/axw/gocov/gocov
+	gocov test | gocov report
+
+.PHONY: package
+package:
 	go get -v ./...
 	go fmt ./...
 	go vet ./...
-	go test -race -v
-	go build
-	go build ./...
